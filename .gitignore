@@ -1,5 +1,79 @@
-# Enviorment variables
+# ==========================================
+# Project Specific Exclusions
+# ==========================================
+.env
+.venv/
+venv/
+data/raw_logs/
+data/evaluation_results/
+
+# ==========================================
+# Python Standard Exclusions
+# ==========================================
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+*.egg-info/
+lib/
+lib64/
+parts/
+sdist/
+varHere is a complete and customized `.gitignore` file for your Automated Multi-Turn Jailbreak Pipeline.
+
+This file includes standard Python exclusions (like `__pycache__` and `pytest` logs) alongside the specific directories and sensitive files we configured for your red-teaming project.
+
+```text
+# ==========================================
+# LLM Red-Teaming Pipeline .gitignore
+# ==========================================
+
+# 1. Environments & Secrets
+# NEVER commit virtual environments or API keys to GitHub
+.venv/
+venv/
+env/
 .env
 
-# Virtual enviorment
-.venv
+# 2. Generated Data & Reports
+# Ignore the generated JSON logs and HTML reports, but keep the directories
+data/raw_logs/*.json
+data/evaluation_results/*.html
+
+# 3. Python Cache & Build Artifacts
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+
+# 4. OS & IDE Specific Files
+# macOS/Windows system files
+.DS_Store
+Thumbs.db
+
+# VS Code / PyCharm settings
+.vscode/
+.idea/
+
+# 5. Package Management / Tooling Caches
+# pip / pre-commit caches
+.tox/
+.nox/
+.cache/
+pip-log.txt
+pip-delete-this-directory.txt
