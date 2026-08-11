@@ -1,4 +1,3 @@
-```markdown
 # 🛡️ Automated Multi-Turn LLM Red-Teaming Pipeline
 
 An automated, multi-turn red-teaming framework designed to evaluate the safety boundaries and alignment of Large Language Models (LLMs).
@@ -46,7 +45,7 @@ The pipeline operates using a localized 3-model architecture:
 ### Installation
 
 1. **Clone the repository:**
-   ```bash
+```bash
    git clone [https://github.com/yourusername/llm-redteam-pipeline.git](https://github.com/yourusername/llm-redteam-pipeline.git)
    cd llm-redteam-pipeline
 
