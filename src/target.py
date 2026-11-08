@@ -1,6 +1,7 @@
 # src/target.py
 from litellm import completion
 from src.config import TARGET_MODEL
+from src.routing import model_kwargs
 
 
 class TargetLLM:
@@ -11,5 +12,9 @@ class TargetLLM:
         """
         Sends the accumulated conversation history to the Target LLM.
         """
-        response = completion(model=self.model_name, messages=conversation_history)
+        response = completion(
+            model=self.model_name,
+            messages=conversation_history,
+            **model_kwargs(self.model_name),
+        )
         return response.choices[0].message.content

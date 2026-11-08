@@ -3,6 +3,7 @@ import json
 import os
 from litellm import completion
 from src.config import ATTACKER_MODEL
+from src.routing import model_kwargs
 
 
 class AttackerLLM:
@@ -38,5 +39,9 @@ class AttackerLLM:
 
         messages = [{"role": "system", "content": system_prompt}] + conversation_history
 
-        response = completion(model=self.model_name, messages=messages)
+        response = completion(
+            model=self.model_name,
+            messages=messages,
+            **model_kwargs(self.model_name),
+        )
         return response.choices[0].message.content
