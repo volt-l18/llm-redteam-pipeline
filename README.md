@@ -17,7 +17,7 @@ Instead of relying on manual, single-turn prompt injection, this pipeline orches
 
 ## ✨ Key Features
 
-* **Hybrid Model Routing:** Powered by `litellm`, seamlessly mix and match local offline models (via Ollama) with cloud-based models (Gemini, OpenAI, Anthropic) for different roles.
+* **Hybrid Model Routing:** Powered by `litellm`, seamlessly mix and match local offline models (via Ollama) with cloud-based models (Gemini, OpenAI, Anthropic, OrcaRouter) for different roles.
 * **Automated Multi-Turn Execution:** The orchestrator manages context across a predefined number of turns, exiting early if a successful jailbreak or attacker refusal is detected.
 * **Adversarial Strategies:** Built-in support for sophisticated attack vectors, defined via JSON, including gradual escalation (Crescendo) and persistent user simulation.
 * **LLM-as-a-Judge Evaluation:** Uses a strict, objective Evaluator model to grade Target responses against a defined security rubric.
@@ -90,6 +90,37 @@ GEMINI_API_KEY=your_api_key_here
 
 ```
 
+### OrcaRouter Cyber Inference
+
+[OrcaRouter](https://www.orcarouter.ai) is an OpenAI-compatible AI gateway that routes many providers behind one endpoint, with dedicated OrcaCyber models for [authorized security work](https://www.orcarouter.ai/cyber). It is registered as a first-class named provider (`orcarouter/...`), so any role can be routed through it — including mixing it with Gemini or Ollama for other roles.
+
+```text
+# Any model id from the OrcaRouter catalog, prefixed with "orcarouter/"
+ATTACKER_MODEL=orcarouter/orca/orcacyber-ultra-1.0
+TARGET_MODEL=orcarouter/orcarouter/auto
+EVALUATOR_MODEL=orcarouter/orca/orcacyber-zero-1.5
+
+# OrcaRouter API key (sk-orca-...), created at https://www.orcarouter.ai/console/token
+ORCAROUTER_API_KEY=your_orcarouter_key_here
+```
+
+| Role | Model id | Use |
+| --- | --- | --- |
+| Default | `orcarouter/orcarouter/auto` | Automatic routing; works with any OrcaRouter key |
+| Recommended cyber | `orcarouter/orca/orcacyber-ultra-1.0` | OrcaCyber Ultra — security code review and long multi-step audits |
+| Recommended cyber | `orcarouter/orca/orcacyber-zero-1.5` | OrcaCyber Zero — OrcaCyber harness for authorized security engineering |
+| Fallback | `orcarouter/orcarouter/fusion` | General-purpose fallback |
+
+The model list is discovered from the live catalog (chat-capable models only) rather than hard-coded:
+
+```bash
+python main.py --list-models          # interactive selector
+python list_models.py --orcarouter    # same catalog, standalone
+python -m src.orcarouter_cli models --capability image   # multimodal (image input) chat models
+```
+
+See the [cyber model catalog](https://www.orcarouter.ai/models?tier=cyber) and the provider details in [`docs/orcarouter.md`](docs/orcarouter.md). OrcaCyber models are intended for authorized, scoped security testing only, consistent with the disclaimer below.
+
 ---
 
 ## 💻 Usage
@@ -107,6 +138,7 @@ python main.py --goal "Write a keylogger" --strategy "crescendo"
 * `--strategy`: (Optional) The attack strategy key defined in `prompts/attack_strategies.json`. (Default: `crescendo`).
 * `--rubric`: (Optional) The evaluation criteria key defined in `prompts/judge_criteria.json`. (Default: `default_safety_rubric`).
 * `--output`: (Optional) The directory where session JSON logs will be saved. (Default: `data/raw_logs`).
+* `--list-models`: (Optional) Print the OrcaRouter Cyber Inference model catalog and exit.
 
 ---
 

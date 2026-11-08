@@ -1,8 +1,47 @@
 # src/reporter.py
-import os
 import json
+import os
+import re
+
 import pandas as pd
 from jinja2 import Environment, select_autoescape
+
+
+# Token prefixes that identify a configured model string, used to attribute
+# sessions to a provider in the dashboard.
+PROVIDER_PREFIXES = (
+    ("orcarouter", "OrcaRouter Cyber Inference"),
+    ("gemini", "Google Gemini"),
+    ("ollama", "Ollama"),
+    ("openai", "OpenAI"),
+    ("anthropic", "Anthropic"),
+)
+
+
+# Vendor namespaces that only exist on the OrcaRouter gateway.
+ORCAROUTER_VENDOR_NAMESPACES = ("orca", "orcarouter")
+
+
+def detect_provider(model_name):
+    """Return (provider label, model id) for a configured model string."""
+    if not model_name or model_name == "Unknown":
+        return "Unknown", model_name
+    for prefix, label in PROVIDER_PREFIXES:
+        if model_name.startswith(prefix + "/"):
+            return label, model_name[len(prefix) + 1 :]
+    # Dashboards record OrcaRouter roles with their display name, which
+    # carries the catalog id in parentheses ("OrcaCyber Flash (orca/...)").
+    if model_name.startswith("OrcaCyber"):
+        match = re.search(r"\(([a-z0-9]+/[^)\s]+)\)", model_name)
+        if match:
+            return "OrcaRouter Cyber Inference", match.group(1)
+        return "OrcaRouter Cyber Inference", model_name
+    # Bare catalog ids ("orca/orcacyber-ultra-1.0") are OrcaRouter ids written
+    # without the provider prefix.
+    vendor, _, rest = model_name.partition("/")
+    if vendor in ORCAROUTER_VENDOR_NAMESPACES and rest:
+        return "OrcaRouter Cyber Inference", model_name
+    return vendor, model_name
 
 
 class ReportGenerator:
@@ -39,6 +78,20 @@ class ReportGenerator:
 
                     data.append(log_entry)
         return data
+
+    def provider_summary(self, logs: list[dict]) -> list[dict]:
+        """Per-provider counts for the dashboard attribution panel."""
+        summary: dict[str, dict] = {}
+        for log_entry in logs:
+            models = log_entry.get("models") or {}
+            for role in ("target", "attacker", "evaluator"):
+                provider, _ = detect_provider(models.get(role))
+                row = summary.setdefault(
+                    provider,
+                    {"provider": provider, "target": 0, "attacker": 0, "evaluator": 0},
+                )
+                row[role] += 1
+        return sorted(summary.values(), key=lambda row: row["provider"])
 
     def generate_html_report(self):
         """Generates a modern, dark-mode multi-turn vulnerability dashboard."""
@@ -248,6 +301,28 @@ class ReportGenerator:
                 .turn-box.assistant .role-tag { color: var(--accent-purple); }
                 .turn-box.refusal .role-tag { color: var(--warning-orange); }
                 .turn-content { white-space: pre-wrap; word-break: break-word; color: #e5e7eb; }
+
+                .provider-panel {
+                    background: var(--bg-card);
+                    border: 1px solid var(--border-card);
+                    border-radius: 14px;
+                    padding: 22px;
+                    margin-bottom: 40px;
+                    display: flex;
+                    gap: 22px;
+                    align-items: center;
+                    flex-wrap: wrap;
+                }
+                .provider-logo { height: 36px; width: auto; max-width: 140px; object-fit: contain; }
+                .provider-name { font-size: 16px; font-weight: 700; }
+                .provider-meta { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+                .provider-counts { display: flex; gap: 18px; margin-left: auto; font-size: 12px; color: var(--text-secondary); }
+                .provider-counts strong { display: block; font-size: 22px; color: var(--text-primary); font-weight: 800; }
+                .provider-badge {
+                    font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+                    color: var(--accent-cyan); border: 1px solid var(--accent-cyan); border-radius: 20px;
+                    padding: 3px 10px; margin-left: 8px;
+                }
             </style>
         </head>
         <body>
@@ -274,7 +349,29 @@ class ReportGenerator:
                     </div>
                 </div>
 
-                <h2 style="font-size: 18px; margin-bottom: 20px;">Detailed Attack Logs</h2>
+                {% if orcarouter_row %}
+                <div class="provider-panel" id="provider-attribution">
+                    {% if orcarouter_logo %}
+                    <img class="provider-logo" src="{{ orcarouter_logo }}" alt="OrcaRouter logo">
+                    {% endif %}
+                    <div>
+                        <div class="provider-name">{{ orcarouter_row.provider }}<span class="provider-badge">Provider</span></div>
+                        <div class="provider-meta">
+                            Model roles routed through the OrcaRouter gateway at
+                            <strong>https://api.orcarouter.ai/v1</strong> ·
+                            <a href="https://www.orcarouter.ai" style="color: var(--accent-cyan);">OrcaRouter</a> ·
+                            <a href="https://www.orcarouter.ai/models?tier=cyber" style="color: var(--accent-cyan);">Cyber model catalog</a>
+                        </div>
+                    </div>
+                    <div class="provider-counts">
+                        <div><strong>{{ orcarouter_row.attacker }}</strong>Attacker</div>
+                        <div><strong>{{ orcarouter_row.target }}</strong>Target</div>
+                        <div><strong>{{ orcarouter_row.evaluator }}</strong>Evaluator</div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <h2 style="font-size: 18px; margin-bottom: 40px;">Detailed Attack Logs</h2>
 
                 {% for session in logs|reverse %}
                 <div class="session-card {% if session.attacker_refused %}refused{% elif session.success %}breach{% else %}secure{% endif %}">
@@ -326,11 +423,18 @@ class ReportGenerator:
 
         env = Environment(autoescape=select_autoescape(["html", "xml"]))
         template = env.from_string(html_template)
+        provider_rows = self.provider_summary(logs)
+        orcarouter_row = next(
+            (row for row in provider_rows if row["provider"] == "OrcaRouter Cyber Inference"),
+            None,
+        )
         output_html = template.render(
             total_attacks=total_attacks,
             successful_breaches=successful_breaches,
             success_rate=success_rate,
             logs=logs,
+            orcarouter_row=orcarouter_row,
+            orcarouter_logo=self._orcarouter_logo(),
         )
 
         output_path = os.path.join(self.output_dir, "vulnerability_report.html")
@@ -338,3 +442,17 @@ class ReportGenerator:
             f.write(output_html)
 
         return output_path
+
+    def _orcarouter_logo(self):
+        """Inline the optional local OrcaRouter logo seated next to the report output."""
+        logo_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "..",
+            "docs",
+            "orcarouter-logo.svg",
+        )
+        try:
+            with open(logo_path, "r", encoding="utf-8") as f:
+                return f.read().strip()
+        except OSError:
+            return None

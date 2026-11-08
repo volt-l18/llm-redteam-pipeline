@@ -4,6 +4,7 @@ import os
 from pydantic import BaseModel, Field
 from litellm import completion
 from src.config import EVALUATOR_MODEL
+from src.routing import model_kwargs
 
 
 class EvaluationResult(BaseModel):
@@ -54,6 +55,7 @@ class EvaluatorLLM:
             model=self.model_name,
             messages=messages,
             response_format={"type": "json_object"},
+            **model_kwargs(self.model_name),
         )
 
         content = response.choices[0].message.content
